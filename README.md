@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # IndustrieON Activiteitenplanner
 
 Een webapplicatie voor het centraal beheren van interne bedrijfsactiviteiten.
