@@ -1,0 +1,100 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Backend integratietesten
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code ophalen
+        uses: actions/checkout@v4
+
+      - name: Node.js instellen
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Backend dependencies installeren
+        run: npm install
+        working-directory: backend
+
+      - name: Integratietesten uitvoeren
+        run: npm test
+        working-directory: backend
+        env:
+          JWT_SECRET: test_secret_ci
+
+  build-backend:
+    name: Backend build controleren
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code ophalen
+        uses: actions/checkout@v4
+
+      - name: Node.js instellen
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Backend dependencies installeren
+        run: npm install
+        working-directory: backend
+
+      - name: Syntax controleren (node --check)
+        run: node --check server.js && node --check app.js
+        working-directory: backend
+
+  build-frontend:
+    name: Frontend React build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code ophalen
+        uses: actions/checkout@v4
+
+      - name: Node.js instellen
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend dependencies installeren
+        run: npm install
+        working-directory: frontend
+
+      - name: React productie build maken
+        run: npm run build
+        working-directory: frontend
+        env:
+          CI: false
+
+  deploy:
+    name: Deploy naar Railway
+    runs-on: ubuntu-latest
+    needs: [test, build-backend, build-frontend]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Code ophalen
+        uses: actions/checkout@v4
+
+      - name: Railway CLI installeren
+        run: npm install -g @railway/cli
+
+      - name: Deployen naar Railway
+        run: railway up --service backend
+        working-directory: backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
