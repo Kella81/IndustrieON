@@ -123,3 +123,30 @@ industrieon/
 - **Database:** SQLite (via better-sqlite3)
 - **Authenticatie:** JWT (JSON Web Tokens)
 - **Wachtwoorden:** bcrypt hashing
+
+
+Leeruitkomst 22:
+De ICT-professional ontwerp een backend-architectuur en database van een vraagstuk uit een organisatie aan de hand van vastgelegde en geprioriteerde requirements.
+Indicatoren:
+
+De ICT-professional analyseert een organisatievraagstuk in overleg met de beroepspraktijk. 
+De ICT-professional stelt requirements op voor de backend-architectuur en verzamelt feedback van mede-professionals.
+De ICT-professional modelleert een databaseschema afgestemd op het organisatievraagstuk.
+De ICT-professional presenteert de gemodelleerde architectuur en database. De ICT-professional documenteert de API-endpoints inclusief request/response formaten en authenticatie vereisten. 
+Leeruitkomst 23:
+De ICT-professional realiseert een veilige API met databasekoppeling, gebruik makend van een versiebeheersysteem en schrijft en gebruikt integratietesten om de software te valideren.
+Indicatoren:
+
+De ICT-professional ontwikkelt een API volgens de gespecificeerde architectuur, gebruik makend van een passend framework. 
+De ICT-professional realiseert een databasekoppeling.
+De ICT-professional implementeert beveiligingsmaatregelen in de API, waaronder authenticatie, autorisatie en input validatie.
+De ICT-professional ontwikkelt en voert integratietesten uit voor kritieke endpoints.
+De ICT-professional voert een code review uit en past code aan op basis van best practices en teamfeedback. 
+Leeruitkomst 24:
+De ICT-professional ontwerpt, configureert en implementeert een deployment pipeline binnen een DevOps-omgeving met behulp van versiebeheer, continuous integration en continous deployment.
+Indicatoren:
+
+De ICT-professional ontwerpt een strategie voor het beheren van de deployment. 
+De ICT-professional configureert een continuous integration en continuous deployment pipeline.
+De ICT-professional implementeert geautomatiseerde build processen voor de backend applicatie.
+De ICT-professional configureert cloudinfrastructuur voor het hosten van de backend-applicatie. 
