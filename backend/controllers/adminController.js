@@ -3,67 +3,68 @@
 // Statistieken en gebruikersbeheer
 // ============================================
 
-const db = require('../models/database');
+const { User, Activity, Registration, Feedback, sequelize } = require('../models');
+const { Op, fn, col, literal } = require('sequelize');
 
 /**
  * Haal statistieken op voor het admin dashboard
  * GET /api/admin/stats
  */
-function statistieken(req, res) {
-  // Totaal aantal gebruikers
-  const totaalGebruikers = db.prepare('SELECT COUNT(*) AS aantal FROM users').get();
+async function statistieken(req, res) {
+  const totaalGebruikers = await User.count();
+  const totaalActiviteiten = await Activity.count();
 
-  // Totaal aantal activiteiten
-  const totaalActiviteiten = db.prepare('SELECT COUNT(*) AS aantal FROM activities').get();
+  const populairste = await Activity.findAll({
+    attributes: [
+      'id', 'title', 'date', 'capacity',
+      [fn('COUNT', col('Registrations.id')), 'deelnemers_aantal']
+    ],
+    include: [
+      { model: User, as: 'organisator', attributes: [['name', 'organizer_name']] },
+      {
+        model: Registration,
+        attributes: [],
+        where: { status: { [Op.ne]: 'niet_aanwezig' } },
+        required: false
+      }
+    ],
+    group: ['Activity.id'],
+    order: [[literal('deelnemers_aantal'), 'DESC']],
+    limit: 10,
+    subQuery: false
+  });
 
-  // Populairste activiteiten (meeste deelnemers)
-  const populairste = db.prepare(`
-    SELECT 
-      a.id, a.title, a.date, a.capacity,
-      u.name AS organizer_name,
-      COUNT(r.id) AS deelnemers_aantal
-    FROM activities a
-    LEFT JOIN registrations r ON r.activity_id = a.id AND r.status != 'niet_aanwezig'
-    JOIN users u ON a.organizer_id = u.id
-    GROUP BY a.id
-    ORDER BY deelnemers_aantal DESC
-    LIMIT 10
-  `).all();
+  const beoordelingen = await Activity.findAll({
+    attributes: [
+      'id', 'title',
+      [fn('ROUND', fn('AVG', col('Feedbacks.rating')), 1), 'gemiddelde_rating'],
+      [fn('COUNT', col('Feedbacks.id')), 'aantal_reviews']
+    ],
+    include: [{ model: Feedback, attributes: [], required: true }],
+    group: ['Activity.id'],
+    order: [[literal('gemiddelde_rating'), 'DESC']],
+    limit: 10,
+    subQuery: false
+  });
 
-  // Activiteiten met gemiddelde rating
-  const beoordelingen = db.prepare(`
-    SELECT 
-      a.id, a.title,
-      ROUND(AVG(f.rating), 1) AS gemiddelde_rating,
-      COUNT(f.id) AS aantal_reviews
-    FROM activities a
-    JOIN feedback f ON f.activity_id = a.id
-    GROUP BY a.id
-    ORDER BY gemiddelde_rating DESC
-    LIMIT 10
-  `).all();
+  const rolVerdeling = await User.findAll({
+    attributes: ['role', [fn('COUNT', col('id')), 'aantal']],
+    group: ['role']
+  });
 
-  // Gebruikers per rol
-  const rolVerdeling = db.prepare(`
-    SELECT role, COUNT(*) AS aantal FROM users GROUP BY role
-  `).all();
-
-  // Recente registraties
-  const recenteRegistraties = db.prepare(`
-    SELECT 
-      r.status, r.created_at,
-      u.name AS user_name,
-      a.title AS activity_title
-    FROM registrations r
-    JOIN users u ON r.user_id = u.id
-    JOIN activities a ON r.activity_id = a.id
-    ORDER BY r.created_at DESC
-    LIMIT 15
-  `).all();
+  const recenteRegistraties = await Registration.findAll({
+    attributes: ['status', 'created_at'],
+    include: [
+      { model: User, as: 'gebruiker', attributes: [['name', 'user_name']] },
+      { model: Activity, attributes: [['title', 'activity_title']] }
+    ],
+    order: [['created_at', 'DESC']],
+    limit: 15
+  });
 
   res.json({
-    totaal_gebruikers: totaalGebruikers.aantal,
-    totaal_activiteiten: totaalActiviteiten.aantal,
+    totaal_gebruikers: totaalGebruikers,
+    totaal_activiteiten: totaalActiviteiten,
     populairste_activiteiten: populairste,
     best_beoordeeld: beoordelingen,
     rol_verdeling: rolVerdeling,
@@ -75,10 +76,11 @@ function statistieken(req, res) {
  * Haal alle gebruikers op
  * GET /api/admin/users
  */
-function alleGebruikers(req, res) {
-  const gebruikers = db.prepare(
-    'SELECT id, name, email, role, created_at FROM users ORDER BY created_at DESC'
-  ).all();
+async function alleGebruikers(req, res) {
+  const gebruikers = await User.findAll({
+    attributes: ['id', 'name', 'email', 'role', 'created_at'],
+    order: [['created_at', 'DESC']]
+  });
   res.json(gebruikers);
 }
 
@@ -86,7 +88,7 @@ function alleGebruikers(req, res) {
  * Wijzig de rol van een gebruiker
  * PUT /api/admin/users/:id/role
  */
-function wijzigRol(req, res) {
+async function wijzigRol(req, res) {
   const { id } = req.params;
   const { role } = req.body;
 
@@ -95,12 +97,12 @@ function wijzigRol(req, res) {
     return res.status(400).json({ fout: 'Ongeldige rol.' });
   }
 
-  const gebruiker = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+  const gebruiker = await User.findByPk(id);
   if (!gebruiker) {
     return res.status(404).json({ fout: 'Gebruiker niet gevonden.' });
   }
 
-  db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+  await gebruiker.update({ role });
   res.json({ bericht: 'Rol succesvol gewijzigd.' });
 }
 
@@ -108,20 +110,19 @@ function wijzigRol(req, res) {
  * Verwijder een gebruiker
  * DELETE /api/admin/users/:id
  */
-function verwijderGebruiker(req, res) {
+async function verwijderGebruiker(req, res) {
   const { id } = req.params;
 
-  // Voorkom dat admin zichzelf verwijdert
   if (Number(id) === req.user.id) {
     return res.status(400).json({ fout: 'Je kunt jezelf niet verwijderen.' });
   }
 
-  const gebruiker = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+  const gebruiker = await User.findByPk(id);
   if (!gebruiker) {
     return res.status(404).json({ fout: 'Gebruiker niet gevonden.' });
   }
 
-  db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  await gebruiker.destroy();
   res.json({ bericht: 'Gebruiker verwijderd.' });
 }
 

@@ -3,22 +3,26 @@
 // CRUD operaties voor activiteiten
 // ============================================
 
-const db = require('../models/database');
+const { Activity, User, Registration, Poll, PollOption, PollResponse, Comment, Feedback, sequelize } = require('../models');
+const { fn, col, literal, Op } = require('sequelize');
 
 /**
  * Haal alle activiteiten op
  * GET /api/activities
  */
-function alleActiviteiten(req, res) {
-  const activiteiten = db.prepare(`
-    SELECT 
-      a.*,
-      u.name AS organizer_name,
-      (SELECT COUNT(*) FROM registrations r WHERE r.activity_id = a.id AND r.status != 'niet_aanwezig') AS deelnemers_aantal
-    FROM activities a
-    JOIN users u ON a.organizer_id = u.id
-    ORDER BY a.date ASC
-  `).all();
+async function alleActiviteiten(req, res) {
+  const activiteiten = await Activity.findAll({
+    attributes: {
+      include: [
+        [
+          literal(`(SELECT COUNT(*) FROM registrations r WHERE r.activity_id = Activity.id AND r.status != 'niet_aanwezig')`),
+          'deelnemers_aantal'
+        ]
+      ]
+    },
+    include: [{ model: User, as: 'organisator', attributes: [['name', 'organizer_name']] }],
+    order: [['date', 'ASC']]
+  });
 
   res.json(activiteiten);
 }
@@ -27,66 +31,66 @@ function alleActiviteiten(req, res) {
  * Haal een specifieke activiteit op met details
  * GET /api/activities/:id
  */
-function activiteitDetail(req, res) {
+async function activiteitDetail(req, res) {
   const { id } = req.params;
 
-  // Activiteit ophalen met organisator naam
-  const activiteit = db.prepare(`
-    SELECT 
-      a.*,
-      u.name AS organizer_name,
-      (SELECT COUNT(*) FROM registrations r WHERE r.activity_id = a.id AND r.status != 'niet_aanwezig') AS deelnemers_aantal
-    FROM activities a
-    JOIN users u ON a.organizer_id = u.id
-    WHERE a.id = ?
-  `).get(id);
+  const activiteit = await Activity.findByPk(id, {
+    attributes: {
+      include: [
+        [
+          literal(`(SELECT COUNT(*) FROM registrations r WHERE r.activity_id = Activity.id AND r.status != 'niet_aanwezig')`),
+          'deelnemers_aantal'
+        ]
+      ]
+    },
+    include: [{ model: User, as: 'organisator', attributes: [['name', 'organizer_name']] }]
+  });
 
   if (!activiteit) {
     return res.status(404).json({ fout: 'Activiteit niet gevonden.' });
   }
 
-  // Deelnemers ophalen
-  const deelnemers = db.prepare(`
-    SELECT r.status, u.id, u.name, u.email
-    FROM registrations r
-    JOIN users u ON r.user_id = u.id
-    WHERE r.activity_id = ?
-  `).all(id);
+  const deelnemers = await Registration.findAll({
+    where: { activity_id: id },
+    include: [{ model: User, as: 'gebruiker', attributes: ['id', 'name', 'email'] }]
+  });
 
-  // Polls ophalen met opties en stemmen
-  const polls = db.prepare('SELECT * FROM polls WHERE activity_id = ?').all(id);
-  for (const poll of polls) {
-    poll.options = db.prepare(`
-      SELECT po.*, 
-        (SELECT COUNT(*) FROM poll_responses pr WHERE pr.option_id = po.id) AS stemmen
-      FROM poll_options po
-      WHERE po.poll_id = ?
-    `).all(poll.id);
-  }
+  const polls = await Poll.findAll({
+    where: { activity_id: id },
+    include: [{
+      model: PollOption,
+      as: 'options',
+      attributes: {
+        include: [
+          [literal(`(SELECT COUNT(*) FROM poll_responses pr WHERE pr.option_id = PollOption.id)`), 'stemmen']
+        ]
+      }
+    }]
+  });
 
-  // Feedback ophalen
-  const feedback = db.prepare(`
-    SELECT f.*, u.name AS user_name
-    FROM feedback f
-    JOIN users u ON f.user_id = u.id
-    WHERE f.activity_id = ?
-    ORDER BY f.created_at DESC
-  `).all(id);
+  const feedback = await Feedback.findAll({
+    where: { activity_id: id },
+    include: [{ model: User, as: 'gebruiker', attributes: [['name', 'user_name']] }],
+    order: [['created_at', 'DESC']]
+  });
 
-  // Gemiddelde rating berekenen
-  const ratingData = db.prepare(`
-    SELECT AVG(rating) AS gemiddelde, COUNT(*) AS aantal
-    FROM feedback
-    WHERE activity_id = ?
-  `).get(id);
+  const ratingData = await Feedback.findOne({
+    where: { activity_id: id },
+    attributes: [
+      [fn('AVG', col('rating')), 'gemiddelde'],
+      [fn('COUNT', col('id')), 'aantal']
+    ]
+  });
+
+  const gemiddelde = ratingData?.dataValues?.gemiddelde;
 
   res.json({
-    ...activiteit,
+    ...activiteit.toJSON(),
     deelnemers,
     polls,
     feedback,
-    gemiddelde_rating: ratingData.gemiddelde ? Math.round(ratingData.gemiddelde * 10) / 10 : null,
-    feedback_aantal: ratingData.aantal
+    gemiddelde_rating: gemiddelde ? Math.round(gemiddelde * 10) / 10 : null,
+    feedback_aantal: ratingData?.dataValues?.aantal ?? 0
   });
 }
 
@@ -94,18 +98,16 @@ function activiteitDetail(req, res) {
  * Maak een nieuwe activiteit aan (alleen ORGANIZER en ADMIN)
  * POST /api/activities
  */
-function maakActiviteit(req, res) {
+async function maakActiviteit(req, res) {
   const { title, description, location, date, capacity } = req.body;
 
   if (!title || !description || !location || !date || !capacity) {
     return res.status(400).json({ fout: 'Alle velden zijn verplicht.' });
   }
 
-  const resultaat = db.prepare(
-    'INSERT INTO activities (title, description, location, date, capacity, organizer_id) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(title, description, location, date, capacity, req.user.id);
-
-  const activiteit = db.prepare('SELECT * FROM activities WHERE id = ?').get(resultaat.lastInsertRowid);
+  const activiteit = await Activity.create({
+    title, description, location, date, capacity, organizer_id: req.user.id
+  });
 
   res.status(201).json({
     bericht: 'Activiteit succesvol aangemaakt!',
@@ -117,47 +119,43 @@ function maakActiviteit(req, res) {
  * Werk een activiteit bij (alleen de organisator of ADMIN)
  * PUT /api/activities/:id
  */
-function werkActiviteitBij(req, res) {
+async function werkActiviteitBij(req, res) {
   const { id } = req.params;
   const { title, description, location, date, capacity } = req.body;
 
-  const activiteit = db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
+  const activiteit = await Activity.findByPk(id);
   if (!activiteit) {
     return res.status(404).json({ fout: 'Activiteit niet gevonden.' });
   }
 
-  // Alleen de organisator of een admin mag bewerken
   if (activiteit.organizer_id !== req.user.id && req.user.role !== 'ADMIN') {
     return res.status(403).json({ fout: 'Je mag deze activiteit niet bewerken.' });
   }
 
-  db.prepare(`
-    UPDATE activities SET 
-      title = COALESCE(?, title),
-      description = COALESCE(?, description),
-      location = COALESCE(?, location),
-      date = COALESCE(?, date),
-      capacity = COALESCE(?, capacity)
-    WHERE id = ?
-  `).run(title, description, location, date, capacity, id);
+  await activiteit.update({
+    title: title ?? activiteit.title,
+    description: description ?? activiteit.description,
+    location: location ?? activiteit.location,
+    date: date ?? activiteit.date,
+    capacity: capacity ?? activiteit.capacity
+  });
 
-  const bijgewerkt = db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
-  res.json({ bericht: 'Activiteit bijgewerkt!', activiteit: bijgewerkt });
+  res.json({ bericht: 'Activiteit bijgewerkt!', activiteit });
 }
 
 /**
  * Verwijder een activiteit (alleen ADMIN)
  * DELETE /api/activities/:id
  */
-function verwijderActiviteit(req, res) {
+async function verwijderActiviteit(req, res) {
   const { id } = req.params;
 
-  const activiteit = db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
+  const activiteit = await Activity.findByPk(id);
   if (!activiteit) {
     return res.status(404).json({ fout: 'Activiteit niet gevonden.' });
   }
 
-  db.prepare('DELETE FROM activities WHERE id = ?').run(id);
+  await activiteit.destroy();
   res.json({ bericht: 'Activiteit succesvol verwijderd.' });
 }
 
@@ -165,52 +163,40 @@ function verwijderActiviteit(req, res) {
  * Meld aan voor een activiteit
  * POST /api/activities/:id/register
  */
-function registreer(req, res) {
+async function registreer(req, res) {
   const { id } = req.params;
   const { status } = req.body;
   const userId = req.user.id;
 
-  // Valideer status
   const geldige = ['aanwezig', 'misschien', 'niet_aanwezig'];
   if (!status || !geldige.includes(status)) {
     return res.status(400).json({ fout: 'Ongeldige status. Kies: aanwezig, misschien of niet_aanwezig.' });
   }
 
-  // Controleer of activiteit bestaat
-  const activiteit = db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
+  const activiteit = await Activity.findByPk(id);
   if (!activiteit) {
     return res.status(404).json({ fout: 'Activiteit niet gevonden.' });
   }
 
-  // Controleer capaciteit (alleen als status niet "niet_aanwezig" is)
   if (status !== 'niet_aanwezig') {
-    const aantalDeelnemers = db.prepare(
-      "SELECT COUNT(*) AS aantal FROM registrations WHERE activity_id = ? AND status != 'niet_aanwezig'"
-    ).get(id);
+    const aantalDeelnemers = await Registration.count({
+      where: { activity_id: id, status: { [Op.ne]: 'niet_aanwezig' } }
+    });
 
-    // Check of er al een bestaande registratie is
-    const bestaand = db.prepare(
-      'SELECT * FROM registrations WHERE user_id = ? AND activity_id = ?'
-    ).get(userId, id);
+    const bestaand = await Registration.findOne({ where: { user_id: userId, activity_id: id } });
 
-    // Als er geen bestaande registratie is en de activiteit is vol
-    if (!bestaand && aantalDeelnemers.aantal >= activiteit.capacity) {
+    if (!bestaand && aantalDeelnemers >= activiteit.capacity) {
       return res.status(400).json({ fout: 'Deze activiteit zit helaas vol.' });
     }
   }
 
-  // Upsert: bijwerken als al aangemeld, anders nieuw aanmaken
-  const bestaand = db.prepare(
-    'SELECT * FROM registrations WHERE user_id = ? AND activity_id = ?'
-  ).get(userId, id);
+  const bestaand = await Registration.findOne({ where: { user_id: userId, activity_id: id } });
 
   if (bestaand) {
-    db.prepare('UPDATE registrations SET status = ? WHERE id = ?').run(status, bestaand.id);
+    await bestaand.update({ status });
     res.json({ bericht: 'Aanmelding bijgewerkt!', status });
   } else {
-    db.prepare(
-      'INSERT INTO registrations (user_id, activity_id, status) VALUES (?, ?, ?)'
-    ).run(userId, id, status);
+    await Registration.create({ user_id: userId, activity_id: id, status });
     res.status(201).json({ bericht: 'Succesvol aangemeld!', status });
   }
 }
@@ -219,7 +205,7 @@ function registreer(req, res) {
  * Voeg een bericht toe aan een activiteit
  * POST /api/activities/:id/comments
  */
-function plaatsBericht(req, res) {
+async function plaatsBericht(req, res) {
   const { id } = req.params;
   const { message, parent_id } = req.body;
 
@@ -227,39 +213,37 @@ function plaatsBericht(req, res) {
     return res.status(400).json({ fout: 'Bericht mag niet leeg zijn.' });
   }
 
-  const activiteit = db.prepare('SELECT id FROM activities WHERE id = ?').get(id);
+  const activiteit = await Activity.findByPk(id);
   if (!activiteit) {
     return res.status(404).json({ fout: 'Activiteit niet gevonden.' });
   }
 
-  const resultaat = db.prepare(
-    'INSERT INTO comments (activity_id, user_id, message, parent_id) VALUES (?, ?, ?, ?)'
-  ).run(id, req.user.id, message, parent_id || null);
+  const bericht = await Comment.create({
+    activity_id: id,
+    user_id: req.user.id,
+    message,
+    parent_id: parent_id || null
+  });
 
-  const bericht = db.prepare(`
-    SELECT c.*, u.name AS user_name
-    FROM comments c
-    JOIN users u ON c.user_id = u.id
-    WHERE c.id = ?
-  `).get(resultaat.lastInsertRowid);
+  const volledig = await Comment.findByPk(bericht.id, {
+    include: [{ model: User, as: 'gebruiker', attributes: [['name', 'user_name']] }]
+  });
 
-  res.status(201).json(bericht);
+  res.status(201).json(volledig);
 }
 
 /**
  * Haal berichten op van een activiteit
  * GET /api/activities/:id/comments
  */
-function haalBerichten(req, res) {
+async function haalBerichten(req, res) {
   const { id } = req.params;
 
-  const berichten = db.prepare(`
-    SELECT c.*, u.name AS user_name, u.role AS user_role
-    FROM comments c
-    JOIN users u ON c.user_id = u.id
-    WHERE c.activity_id = ?
-    ORDER BY c.created_at ASC
-  `).all(id);
+  const berichten = await Comment.findAll({
+    where: { activity_id: id },
+    include: [{ model: User, as: 'gebruiker', attributes: [['name', 'user_name'], ['role', 'user_role']] }],
+    order: [['created_at', 'ASC']]
+  });
 
   res.json(berichten);
 }
@@ -268,7 +252,7 @@ function haalBerichten(req, res) {
  * Geef feedback op een activiteit
  * POST /api/activities/:id/feedback
  */
-function geefFeedback(req, res) {
+async function geefFeedback(req, res) {
   const { id } = req.params;
   const { rating, comment } = req.body;
 
@@ -276,23 +260,18 @@ function geefFeedback(req, res) {
     return res.status(400).json({ fout: 'Rating moet tussen 1 en 5 zijn.' });
   }
 
-  const activiteit = db.prepare('SELECT id FROM activities WHERE id = ?').get(id);
+  const activiteit = await Activity.findByPk(id);
   if (!activiteit) {
     return res.status(404).json({ fout: 'Activiteit niet gevonden.' });
   }
 
-  // Controleer of gebruiker al feedback heeft gegeven
-  const bestaand = db.prepare(
-    'SELECT id FROM feedback WHERE user_id = ? AND activity_id = ?'
-  ).get(req.user.id, id);
+  const bestaand = await Feedback.findOne({ where: { user_id: req.user.id, activity_id: id } });
 
   if (bestaand) {
-    db.prepare('UPDATE feedback SET rating = ?, comment = ? WHERE id = ?').run(rating, comment || null, bestaand.id);
+    await bestaand.update({ rating, comment: comment || null });
     res.json({ bericht: 'Feedback bijgewerkt!' });
   } else {
-    db.prepare(
-      'INSERT INTO feedback (activity_id, user_id, rating, comment) VALUES (?, ?, ?, ?)'
-    ).run(id, req.user.id, rating, comment || null);
+    await Feedback.create({ activity_id: id, user_id: req.user.id, rating, comment: comment || null });
     res.status(201).json({ bericht: 'Feedback toegevoegd!' });
   }
 }

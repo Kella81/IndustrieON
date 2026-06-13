@@ -6,7 +6,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const db = require('./models/database');
+const { initialiseerDatabase } = require('./models');
 
 const app = express();
 
@@ -14,8 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 async function setupApp() {
-  await db.initializeDatabase();
-  db.initialiseerDatabase();
+  await initialiseerDatabase();
 
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/activities', require('./routes/activities'));
