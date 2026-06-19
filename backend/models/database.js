@@ -1,17 +1,34 @@
 // ============================================
 // Database configuratie
-// Gebruikt SQLite via Sequelize ORM
+// Gebruikt PostgreSQL op Railway, SQLite lokaal
 // ============================================
 
 const { Sequelize } = require('sequelize');
 const path = require('path');
 
-const dbPad = path.join(__dirname, '..', 'industrieon.db');
+let sequelize;
 
-const sequelize = new Sequelize({
-  dialect: 'sqlite',
-  storage: dbPad,
-  logging: false
-});
+if (process.env.DATABASE_URL) {
+  // Railway PostgreSQL
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    protocol: 'postgres',
+    logging: false,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    }
+  });
+} else {
+  // Lokale SQLite
+  const dbPad = path.join(__dirname, '..', 'industrieon.db');
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: dbPad,
+    logging: false
+  });
+}
 
 module.exports = sequelize;
