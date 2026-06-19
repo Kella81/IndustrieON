@@ -8,9 +8,11 @@ const path = require('path');
 
 let sequelize;
 
-if (process.env.DATABASE_URL) {
+const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
+
+if (dbUrl) {
   // Railway PostgreSQL
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
+  sequelize = new Sequelize(dbUrl, {
     dialect: 'postgres',
     protocol: 'postgres',
     logging: false,
