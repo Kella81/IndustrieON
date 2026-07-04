@@ -5,7 +5,7 @@
 // ============================================
 
 import { useState, useEffect } from 'react';
-import { haalStatistieken, haalGebruikers, wijzigRol, verwijderGebruiker } from '../services/api';
+import { haalStatistieken, haalGebruikers, wijzigRol, keurGebruikerGoed, verwijderGebruiker } from '../services/api';
 import SterrenRating from '../components/SterrenRating';
 import Laadscherm from '../components/Laadscherm';
 
@@ -51,6 +51,17 @@ function AdminPagina() {
       setGebruikers(res.data);
     } catch (err) {
       toonMelding('Rol wijzigen mislukt.');
+    }
+  };
+
+  const handleGoedkeuren = async (userId, naam) => {
+    try {
+      await keurGebruikerGoed(userId);
+      toonMelding(`${naam} is goedgekeurd.`);
+      const res = await haalGebruikers();
+      setGebruikers(res.data);
+    } catch (err) {
+      toonMelding(err.response?.data?.fout || 'Goedkeuren mislukt.');
     }
   };
 
@@ -221,6 +232,7 @@ function AdminPagina() {
                   <th>Naam</th>
                   <th>Email</th>
                   <th>Rol</th>
+                  <th>Status</th>
                   <th>Acties</th>
                 </tr>
               </thead>
@@ -242,6 +254,20 @@ function AdminPagina() {
                       </select>
                     </td>
                     <td>
+                      <span className={`badge ${g.status === 'ACTIVE' ? 'badge--blauw' : 'badge--oranje'}`}>
+                        {g.status}
+                      </span>
+                    </td>
+                    <td>
+                      {g.status !== 'ACTIVE' && (
+                        <button
+                          onClick={() => handleGoedkeuren(g.id, g.name)}
+                          className="btn btn--primary btn--sm"
+                          style={{ marginRight: '0.5rem' }}
+                        >
+                          Goedkeuren
+                        </button>
+                      )}
                       <button
                         onClick={() => handleVerwijderen(g.id, g.name)}
                         className="btn btn--gevaar btn--sm"

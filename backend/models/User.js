@@ -12,6 +12,12 @@ const User = sequelize.define('User', {
     defaultValue: 'USER',
     validate: { isIn: [['USER', 'ORGANIZER', 'ADMIN']] }
   },
+  status: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'PENDING',
+    validate: { isIn: [['PENDING', 'ACTIVE']] }
+  },
   created_at: { type: DataTypes.STRING }
 }, {
   tableName: 'users',

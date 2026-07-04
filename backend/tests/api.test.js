@@ -7,6 +7,8 @@ process.env.JWT_SECRET = 'test_secret_jest';
 
 const request = require('supertest');
 const { setupApp } = require('../app');
+const bcrypt = require('bcryptjs');
+const { User } = require('../models');
 
 let app;
 
@@ -25,13 +27,14 @@ describe('GET /api', () => {
 
 // ---- Registratie ----
 describe('POST /api/auth/register', () => {
-  test('succesvol registreren geeft 201 + token', async () => {
+  test('succesvol registreren geeft 201 en pending user', async () => {
     const res = await request(app)
       .post('/api/auth/register')
       .send({ name: 'Test Gebruiker', email: `user${Date.now()}@test.nl`, password: 'test123' });
     expect(res.statusCode).toBe(201);
-    expect(res.body.token).toBeDefined();
     expect(res.body.user.role).toBe('USER');
+    expect(res.body.user.status).toBe('PENDING');
+    expect(res.body.token).toBeUndefined();
   });
 
   test('ontbrekende velden geeft 400', async () => {
@@ -52,12 +55,27 @@ describe('POST /api/auth/register', () => {
 
 // ---- Inloggen ----
 describe('POST /api/auth/login', () => {
-  test('succesvol inloggen geeft 200 + token', async () => {
+  test('succesvol inloggen van actieve gebruiker geeft 200 + token', async () => {
     const email = `login${Date.now()}@test.nl`;
-    await request(app).post('/api/auth/register').send({ name: 'Login Test', email, password: 'wachtwoord' });
+    const password = 'wachtwoord';
+    await User.create({
+      name: 'Login Test',
+      email,
+      password: bcrypt.hashSync(password, 10),
+      role: 'USER',
+      status: 'ACTIVE'
+    });
     const res = await request(app).post('/api/auth/login').send({ email, password: 'wachtwoord' });
     expect(res.statusCode).toBe(200);
     expect(res.body.token).toBeDefined();
+  });
+
+  test('pending gebruiker kan nog niet inloggen', async () => {
+    const email = `pending${Date.now()}@test.nl`;
+    await request(app).post('/api/auth/register').send({ name: 'Pending Test', email, password: 'wachtwoord' });
+    const res = await request(app).post('/api/auth/login').send({ email, password: 'wachtwoord' });
+    expect(res.statusCode).toBe(403);
+    expect(res.body.fout).toMatch(/goedgekeurd/i);
   });
 
   test('verkeerd wachtwoord geeft 401', async () => {
@@ -104,9 +122,16 @@ describe('Autorisatie op basis van rol', () => {
 
   beforeAll(async () => {
     const email = `roltest${Date.now()}@test.nl`;
+    await User.create({
+      name: 'Gewone User',
+      email,
+      password: bcrypt.hashSync('test123', 10),
+      role: 'USER',
+      status: 'ACTIVE'
+    });
     const res = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'Gewone User', email, password: 'test123' });
+      .post('/api/auth/login')
+      .send({ email, password: 'test123' });
     userToken = res.body.token;
   });
 
@@ -123,5 +148,45 @@ describe('Autorisatie op basis van rol', () => {
       .get('/api/admin/stats')
       .set('Authorization', `Bearer ${userToken}`);
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('Admin goedkeuringsflow', () => {
+  let adminToken;
+
+  test('ADMIN kan pending gebruiker goedkeuren waarna login werkt', async () => {
+    const adminEmail = `admin${Date.now()}@test.nl`;
+    const adminPassword = 'admin123';
+    await User.create({
+      name: 'Admin Test',
+      email: adminEmail,
+      password: bcrypt.hashSync(adminPassword, 10),
+      role: 'ADMIN',
+      status: 'ACTIVE'
+    });
+
+    const adminLogin = await request(app).post('/api/auth/login').send({ email: adminEmail, password: adminPassword });
+    adminToken = adminLogin.body.token;
+    expect(adminLogin.statusCode).toBe(200);
+
+    const userEmail = `wacht${Date.now()}@test.nl`;
+    const registerRes = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Wachtende User', email: userEmail, password: 'user123' });
+
+    expect(registerRes.body.user.status).toBe('PENDING');
+
+    const approveRes = await request(app)
+      .put(`/api/admin/users/${registerRes.body.user.id}/approve`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(approveRes.statusCode).toBe(200);
+
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: userEmail, password: 'user123' });
+
+    expect(loginRes.statusCode).toBe(200);
+    expect(loginRes.body.user.status).toBe('ACTIVE');
   });
 });

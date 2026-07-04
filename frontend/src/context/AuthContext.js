@@ -43,10 +43,8 @@ export function AuthProvider({ children }) {
   };
 
   // Registreren
-  const registreer = async (name, email, password, role) => {
-    const res = await registreerAPI(name, email, password, role);
-    localStorage.setItem('token', res.data.token);
-    setUser(res.data.user);
+  const registreer = async (name, email, password) => {
+    const res = await registreerAPI(name, email, password);
     return res.data;
   };
 

@@ -62,7 +62,7 @@ async function activiteitDetail(req, res) {
       as: 'options',
       attributes: {
         include: [
-          [literal(`(SELECT COUNT(*) FROM poll_responses pr WHERE pr.option_id = PollOption.id)`), 'stemmen']
+          [literal(`(SELECT COUNT(*) FROM poll_responses pr WHERE pr.option_id = options.id)`), 'stemmen']
         ]
       }
     }]

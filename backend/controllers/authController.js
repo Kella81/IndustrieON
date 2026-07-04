@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
  * POST /api/auth/register
  */
 async function registreer(req, res) {
-  const { name, email, password, role } = req.body;
+  const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ fout: 'Naam, email en wachtwoord zijn verplicht.' });
@@ -24,20 +24,17 @@ async function registreer(req, res) {
   }
 
   const gehasht = bcrypt.hashSync(password, 10);
-  const gebruikersRol = (role === 'ORGANIZER') ? 'ORGANIZER' : 'USER';
-
-  const gebruiker = await User.create({ name, email, password: gehasht, role: gebruikersRol });
-
-  const token = jwt.sign(
-    { id: gebruiker.id, name, email, role: gebruikersRol },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  const gebruiker = await User.create({
+    name,
+    email,
+    password: gehasht,
+    role: 'USER',
+    status: 'PENDING'
+  });
 
   res.status(201).json({
-    bericht: 'Account succesvol aangemaakt!',
-    token,
-    user: { id: gebruiker.id, name, email, role: gebruikersRol }
+    bericht: 'Account succesvol aangemaakt! Je account wacht op goedkeuring van de admin.',
+    user: { id: gebruiker.id, name, email, role: 'USER', status: 'PENDING' }
   });
 }
 
@@ -62,6 +59,10 @@ async function login(req, res) {
     return res.status(401).json({ fout: 'Onjuist emailadres of wachtwoord.' });
   }
 
+  if (gebruiker.status !== 'ACTIVE') {
+    return res.status(403).json({ fout: 'Je account moet eerst worden goedgekeurd door de admin.' });
+  }
+
   const token = jwt.sign(
     { id: gebruiker.id, name: gebruiker.name, email: gebruiker.email, role: gebruiker.role },
     process.env.JWT_SECRET,
@@ -71,7 +72,7 @@ async function login(req, res) {
   res.json({
     bericht: 'Succesvol ingelogd!',
     token,
-    user: { id: gebruiker.id, name: gebruiker.name, email: gebruiker.email, role: gebruiker.role }
+    user: { id: gebruiker.id, name: gebruiker.name, email: gebruiker.email, role: gebruiker.role, status: gebruiker.status }
   });
 }
 
@@ -81,7 +82,7 @@ async function login(req, res) {
  */
 async function profiel(req, res) {
   const gebruiker = await User.findByPk(req.user.id, {
-    attributes: ['id', 'name', 'email', 'role', 'created_at']
+    attributes: ['id', 'name', 'email', 'role', 'status', 'created_at']
   });
   if (!gebruiker) {
     return res.status(404).json({ fout: 'Gebruiker niet gevonden.' });

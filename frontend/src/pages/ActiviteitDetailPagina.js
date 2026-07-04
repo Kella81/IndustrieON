@@ -9,14 +9,14 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   haalActiviteit, meldAan, haalBerichten, plaatsBericht,
-  geefFeedback, stemOpPoll
+  geefFeedback, stemOpPoll, maakPoll
 } from '../services/api';
 import SterrenRating from '../components/SterrenRating';
 import Laadscherm from '../components/Laadscherm';
 
 function ActiviteitDetailPagina() {
   const { id } = useParams();
-  const { user, isIngelogd } = useAuth();
+  const { user, isIngelogd, heeftRol } = useAuth();
 
   const [activiteit, setActiviteit] = useState(null);
   const [berichten, setBerichten] = useState([]);
@@ -28,6 +28,9 @@ function ActiviteitDetailPagina() {
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackTekst, setFeedbackTekst] = useState('');
   const [melding, setMelding] = useState('');
+  const [pollVraag, setPollVraag] = useState('');
+  const [pollOpties, setPollOpties] = useState(['', '']);
+  const [pollAanmaken, setPollAanmaken] = useState(false);
 
   // Data laden
   const laadData = useCallback(async () => {
@@ -108,6 +111,26 @@ function ActiviteitDetailPagina() {
       laadData();
     } catch (err) {
       toonMelding(err.response?.data?.fout || 'Stemmen mislukt.');
+    }
+  };
+
+  // Poll aanmaken
+  const handleMaakPoll = async (e) => {
+    e.preventDefault();
+    const geldige = pollOpties.filter(o => o.trim());
+    if (!pollVraag.trim() || geldige.length < 2) {
+      toonMelding('Vul een vraag en minimaal 2 opties in.');
+      return;
+    }
+    try {
+      await maakPoll(id, pollVraag, geldige);
+      toonMelding('Poll aangemaakt!');
+      setPollVraag('');
+      setPollOpties(['', '']);
+      setPollAanmaken(false);
+      laadData();
+    } catch (err) {
+      toonMelding(err.response?.data?.fout || 'Poll aanmaken mislukt.');
     }
   };
 
@@ -218,10 +241,66 @@ function ActiviteitDetailPagina() {
       )}
 
       {/* Polls sectie */}
-      {activiteit.polls && activiteit.polls.length > 0 && (
+      {(activiteit.polls?.length > 0 || (user && (user.id === activiteit.organizer_id || heeftRol('ADMIN')))) && (
         <div className="detail__sectie">
           <h2>Polls</h2>
-          {activiteit.polls.map(poll => (
+
+          {/* Poll aanmaken - alleen voor organisator/admin */}
+          {user && (user.id === activiteit.organizer_id || heeftRol('ADMIN')) && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              {!pollAanmaken ? (
+                <button onClick={() => setPollAanmaken(true)} className="btn btn--outline btn--sm">
+                  + Poll toevoegen
+                </button>
+              ) : (
+                <form onSubmit={handleMaakPoll} className="activiteit__form" style={{ background: 'var(--achtergrond)', padding: '1.25rem', borderRadius: 'var(--radius-sm)' }}>
+                  <div className="form__groep">
+                    <label>Vraag</label>
+                    <input
+                      type="text"
+                      value={pollVraag}
+                      onChange={(e) => setPollVraag(e.target.value)}
+                      placeholder="Bijv. Welk tijdstip past jou het beste?"
+                      required
+                    />
+                  </div>
+                  <div className="form__groep">
+                    <label>Opties</label>
+                    {pollOpties.map((optie, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <input
+                          type="text"
+                          value={optie}
+                          onChange={(e) => {
+                            const nieuw = [...pollOpties];
+                            nieuw[i] = e.target.value;
+                            setPollOpties(nieuw);
+                          }}
+                          placeholder={`Optie ${i + 1}`}
+                        />
+                        {pollOpties.length > 2 && (
+                          <button type="button" className="btn btn--gevaar btn--sm" onClick={() => setPollOpties(pollOpties.filter((_, j) => j !== i))}>
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" className="btn btn--outline btn--sm" onClick={() => setPollOpties([...pollOpties, ''])}>
+                      + Optie toevoegen
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button type="submit" className="btn btn--primary btn--sm">Poll aanmaken</button>
+                    <button type="button" className="btn btn--outline btn--sm" onClick={() => { setPollAanmaken(false); setPollVraag(''); setPollOpties(['', '']); }}>
+                      Annuleren
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+
+          {activiteit.polls?.map(poll => (
             <div key={poll.id} className="poll__kaart">
               <h3 className="poll__vraag">{poll.question}</h3>
               <div className="poll__opties">

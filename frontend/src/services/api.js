@@ -27,8 +27,8 @@ api.interceptors.request.use((config) => {
 export const loginAPI = (email, password) =>
   api.post('/auth/login', { email, password });
 
-export const registreerAPI = (name, email, password, role) =>
-  api.post('/auth/register', { name, email, password, role });
+export const registreerAPI = (name, email, password) =>
+  api.post('/auth/register', { name, email, password });
 
 export const profielAPI = () =>
   api.get('/auth/me');
@@ -80,6 +80,9 @@ export const haalGebruikers = () =>
 
 export const wijzigRol = (userId, role) =>
   api.put(`/admin/users/${userId}/role`, { role });
+
+export const keurGebruikerGoed = (userId) =>
+  api.put(`/admin/users/${userId}/approve`);
 
 export const verwijderGebruiker = (userId) =>
   api.delete(`/admin/users/${userId}`);

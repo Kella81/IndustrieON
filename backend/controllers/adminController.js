@@ -78,10 +78,26 @@ async function statistieken(req, res) {
  */
 async function alleGebruikers(req, res) {
   const gebruikers = await User.findAll({
-    attributes: ['id', 'name', 'email', 'role', 'created_at'],
+    attributes: ['id', 'name', 'email', 'role', 'status', 'created_at'],
     order: [['created_at', 'DESC']]
   });
   res.json(gebruikers);
+}
+
+/**
+ * Keur een gebruiker goed
+ * PUT /api/admin/users/:id/approve
+ */
+async function keurGoed(req, res) {
+  const { id } = req.params;
+
+  const gebruiker = await User.findByPk(id);
+  if (!gebruiker) {
+    return res.status(404).json({ fout: 'Gebruiker niet gevonden.' });
+  }
+
+  await gebruiker.update({ status: 'ACTIVE' });
+  res.json({ bericht: 'Gebruiker goedgekeurd.' });
 }
 
 /**
@@ -126,4 +142,4 @@ async function verwijderGebruiker(req, res) {
   res.json({ bericht: 'Gebruiker verwijderd.' });
 }
 
-module.exports = { statistieken, alleGebruikers, wijzigRol, verwijderGebruiker };
+module.exports = { statistieken, alleGebruikers, wijzigRol, keurGoed, verwijderGebruiker };

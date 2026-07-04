@@ -37,7 +37,7 @@ async function seed() {
 
   const gebruikers = {};
   for (const g of gebruikersData) {
-    const u = await User.create({ ...g, password: wachtwoord });
+    const u = await User.create({ ...g, password: wachtwoord, status: 'ACTIVE' });
     gebruikers[g.email] = u.id;
   }
 

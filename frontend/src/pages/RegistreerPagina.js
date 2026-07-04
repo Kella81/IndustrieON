@@ -11,7 +11,6 @@ function RegistreerPagina() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('USER');
   const [fout, setFout] = useState('');
   const [bezig, setBezig] = useState(false);
   const { registreer } = useAuth();
@@ -23,8 +22,8 @@ function RegistreerPagina() {
     setBezig(true);
 
     try {
-      await registreer(name, email, password, role);
-      navigate('/');
+      await registreer(name, email, password);
+      navigate('/login');
     } catch (err) {
       setFout(err.response?.data?.fout || 'Er ging iets mis bij het registreren.');
     } finally {
@@ -78,14 +77,6 @@ function RegistreerPagina() {
               required
               minLength={6}
             />
-          </div>
-
-          <div className="form__groep">
-            <label htmlFor="role">Rol</label>
-            <select id="role" value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="USER">Medewerker (deelnemer)</option>
-              <option value="ORGANIZER">Organisator</option>
-            </select>
           </div>
 
           <button type="submit" className="btn btn--primary btn--full" disabled={bezig}>

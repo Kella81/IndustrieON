@@ -3,6 +3,7 @@
 // Laadt alle modellen en definieert associaties
 // ============================================
 
+const { DataTypes } = require('sequelize');
 const sequelize = require('./database');
 const User = require('./User');
 const Activity = require('./Activity');
@@ -37,7 +38,7 @@ PollResponse.belongsTo(PollOption, { foreignKey: 'option_id' });
 
 Activity.hasMany(Comment, { foreignKey: 'activity_id', onDelete: 'CASCADE' });
 Comment.belongsTo(Activity, { foreignKey: 'activity_id' });
-
+ 
 User.hasMany(Comment, { foreignKey: 'user_id' });
 Comment.belongsTo(User, { foreignKey: 'user_id', as: 'gebruiker' });
 
@@ -52,6 +53,22 @@ Feedback.belongsTo(User, { foreignKey: 'user_id', as: 'gebruiker' });
 
 async function initialiseerDatabase() {
   await sequelize.sync({ alter: false });
+
+  const queryInterface = sequelize.getQueryInterface();
+  const usersTable = await queryInterface.describeTable('users');
+
+  if (!usersTable.status) {
+    await queryInterface.addColumn('users', 'status', {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'PENDING'
+    });
+  }
+
+  await User.update(
+    { status: 'ACTIVE' },
+    { where: { role: 'ADMIN' } }
+  );
   console.log('Database tabellen succesvol aangemaakt');
 }
 
