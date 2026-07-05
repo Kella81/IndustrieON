@@ -81,7 +81,7 @@ jobs:
           CI: false
 
   deploy:
-    name: Deploy naar Railway
+    name: Deploy naar Vercel
     runs-on: ubuntu-latest
     needs: [test, build-backend, build-frontend]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -90,11 +90,11 @@ jobs:
       - name: Code ophalen
         uses: actions/checkout@v4
 
-      - name: Railway CLI installeren
-        run: npm install -g @railway/cli
+      - name: Vercel CLI installeren
+        run: npm install -g vercel
 
-      - name: Deployen naar Railway
-        run: railway up --service backend
-        working-directory: backend
+      - name: Deployen naar Vercel
+        run: vercel --prod --yes
+        working-directory: frontend
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

@@ -6,17 +6,19 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const { initialiseerDatabase } = require('./models');
 
 const app = express();
+let appInitialised = false;
 
 app.use(cors());
 app.use(express.json());
 
-const frontendBuild = path.join(__dirname, '../frontend/build');
-
 async function setupApp() {
+  if (appInitialised) {
+    return app;
+  }
+
   await initialiseerDatabase();
 
   app.use('/api/auth', require('./routes/auth'));
@@ -28,11 +30,7 @@ async function setupApp() {
     res.json({ bericht: 'IndustrieON API draait!' });
   });
 
-  // Serveer React frontend
-  app.use(express.static(frontendBuild));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendBuild, 'index.html'));
-  });
+  appInitialised = true;
 
   return app;
 }

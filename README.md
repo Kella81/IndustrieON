@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # IndustrieON Activiteitenplanner
 
 Een webapplicatie voor het centraal beheren van interne bedrijfsactiviteiten.
@@ -35,6 +34,27 @@ npm start
 |----------|--------------------------|
 | Frontend | http://localhost:3000     |
 | Backend  | http://localhost:5000/api |
+
+## Deployen naar Vercel
+
+Deze applicatie draait het best als twee aparte Vercel-projecten:
+
+### 1. Frontend project
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Output directory: automatisch via Vercel voor Create React App
+- Environment variable: `REACT_APP_API_URL` = de publieke URL van de backend, bijvoorbeeld `https://industrieon-backend.vercel.app/api`
+
+### 2. Backend project
+- Root directory: `backend`
+- Functie-structuur: Vercel gebruikt `backend/api/index.js` en `backend/api/[...path].js`
+- Environment variables: `JWT_SECRET`, `DATABASE_URL` of `DATABASE_PUBLIC_URL`
+
+### Deployment flow
+1. Deploy de backend eerst naar Vercel.
+2. Kopieer de backend-URL naar `REACT_APP_API_URL` in het frontend project.
+3. Deploy daarna de frontend naar Vercel.
+4. Controleer of de frontend routes werken via `frontend/vercel.json` en of de API bereikbaar is onder `/api`.
 
 ## Inloggegevens
 
@@ -143,7 +163,7 @@ De ICT-professional implementeert beveiligingsmaatregelen in de API, waaronder a
 De ICT-professional ontwikkelt en voert integratietesten uit voor kritieke endpoints.
 De ICT-professional voert een code review uit en past code aan op basis van best practices en teamfeedback. 
 Leeruitkomst 24:
-De ICT-professional ontwerpt, configureert en implementeert een deployment pipeline binnen een DevOps-omgeving met behulp van versiebeheer, continuous integration en continous deployment.
+De ICT-professional ontwerpt, configureert en implementeert een deployment pipeline binnen een DevOps-omgeving met behulp van versiebeheer, continuous integration en continuous deployment.
 Indicatoren:
 
 De ICT-professional ontwerpt een strategie voor het beheren van de deployment. 
