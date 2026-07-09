@@ -76,21 +76,3 @@ jobs:
         env:
           CI: false
 
-  deploy:
-    name: Deploy naar Vercel
-    runs-on: ubuntu-latest
-    needs: [test, build-backend, build-frontend]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
-    steps:
-      - name: Code ophalen
-        uses: actions/checkout@v4
-
-      - name: Vercel CLI installeren
-        run: npm install -g vercel
-
-      - name: Deployen naar Vercel
-        run: vercel --prod --yes
-        working-directory: frontend
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
