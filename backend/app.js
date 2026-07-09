@@ -13,7 +13,7 @@ let appInitialised = false;
 
 const corsOptions = {
   origin: [
-    'https://industrie-on.vercel.app',
+    'https://industrieon.vercel.app',
     'http://localhost:3000',
     'http://localhost:5173'
   ],
