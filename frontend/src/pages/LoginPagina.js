@@ -24,7 +24,11 @@ function LoginPagina() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      setFout(err.response?.data?.fout || 'Er ging iets mis bij het inloggen.');
+      const apiFout = err.response?.data?.fout || err.response?.data?.message;
+      const foutcode = err.response?.status ? ` (${err.response.status})` : '';
+      const netwerkFout = err.message === 'Network Error' ? ' Network Error' : '';
+      setFout(apiFout ? `${apiFout}${foutcode}` : `Er ging iets mis bij het inloggen.${foutcode}${netwerkFout}`);
+      console.error('Login mislukt:', err);
     } finally {
       setBezig(false);
     }
