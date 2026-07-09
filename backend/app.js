@@ -11,7 +11,18 @@ const { initialiseerDatabase } = require('./models');
 const app = express();
 let appInitialised = false;
 
-app.use(cors());
+const corsOptions = {
+  origin: [
+    'https://industrie-on.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 async function setupApp() {
