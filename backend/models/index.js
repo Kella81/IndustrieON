@@ -52,24 +52,32 @@ User.hasMany(Feedback, { foreignKey: 'user_id' });
 Feedback.belongsTo(User, { foreignKey: 'user_id', as: 'gebruiker' });
 
 async function initialiseerDatabase() {
-  await sequelize.sync({ alter: false });
+  // In productie (PostgreSQL) bestaan de tabellen al — sync overslaan voor snellere cold start
+  const isProduction = !!(process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL);
 
-  const queryInterface = sequelize.getQueryInterface();
-  const usersTable = await queryInterface.describeTable('users');
+  if (!isProduction) {
+    await sequelize.sync({ alter: false });
 
-  if (!usersTable.status) {
-    await queryInterface.addColumn('users', 'status', {
-      type: DataTypes.STRING,
-      allowNull: false,
-      defaultValue: 'PENDING'
-    });
+    const queryInterface = sequelize.getQueryInterface();
+    const usersTable = await queryInterface.describeTable('users');
+
+    if (!usersTable.status) {
+      await queryInterface.addColumn('users', 'status', {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: 'PENDING'
+      });
+    }
+
+    await User.update(
+      { status: 'ACTIVE' },
+      { where: { role: 'ADMIN' } }
+    );
   }
 
-  await User.update(
-    { status: 'ACTIVE' },
-    { where: { role: 'ADMIN' } }
-  );
-  console.log('Database tabellen succesvol aangemaakt');
+  // Verbinding testen
+  await sequelize.authenticate();
+  console.log('Database verbinding geslaagd');
 }
 
 module.exports = {
