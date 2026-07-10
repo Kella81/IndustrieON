@@ -3,19 +3,11 @@
 Een webapplicatie voor het centraal beheren van interne bedrijfsactiviteiten.
 Gebouwd met React (frontend) en Node.js/Express (backend).
 
-## Snel starten
-
-### Methode 1: Start script
-```bash
-cd /mnt/HC_Volume_104064564/industrieon
-./start.sh
-```
-
-### Methode 2: Handmatig starten
+## Lokaal starten
 
 **Terminal 1 - Backend:**
 ```bash
-cd /mnt/HC_Volume_104064564/industrieon/backend
+cd backend
 npm install
 npm run seed
 npm start
@@ -23,7 +15,7 @@ npm start
 
 **Terminal 2 - Frontend:**
 ```bash
-cd /mnt/HC_Volume_104064564/industrieon/frontend
+cd frontend
 npm install
 npm start
 ```
