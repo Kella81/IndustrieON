@@ -6,6 +6,9 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
 
+// Expliciet requiren zodat Vercel's bundler pg meeneemt in de deployment
+require('pg');
+
 let sequelize;
 
 const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
