@@ -1,15 +1,15 @@
-const { setupApp } = require('../app');
-
 let appPromise;
 
 async function getApp() {
   if (!appPromise) {
-    appPromise = setupApp().catch((err) => {
-      appPromise = null; // reset zodat de volgende request het opnieuw probeert
+    appPromise = (async () => {
+      const { setupApp } = require('../app');
+      return setupApp();
+    })().catch((err) => {
+      appPromise = null;
       throw err;
     });
   }
-
   return appPromise;
 }
 
