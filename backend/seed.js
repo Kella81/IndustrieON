@@ -12,14 +12,14 @@ async function seed() {
   await initialiseerDatabase();
 
   console.log('Bestaande data verwijderen...');
-  await PollResponse.destroy({ where: {}, truncate: true });
-  await PollOption.destroy({ where: {}, truncate: true });
-  await Poll.destroy({ where: {}, truncate: true });
-  await Feedback.destroy({ where: {}, truncate: true });
-  await Comment.destroy({ where: {}, truncate: true });
-  await Registration.destroy({ where: {}, truncate: true });
-  await Activity.destroy({ where: {}, truncate: true });
-  await User.destroy({ where: {}, truncate: true });
+  await PollResponse.destroy({ where: {}, truncate: true, cascade: true });
+  await PollOption.destroy({ where: {}, truncate: true, cascade: true });
+  await Poll.destroy({ where: {}, truncate: true, cascade: true });
+  await Feedback.destroy({ where: {}, truncate: true, cascade: true });
+  await Comment.destroy({ where: {}, truncate: true, cascade: true });
+  await Registration.destroy({ where: {}, truncate: true, cascade: true });
+  await Activity.destroy({ where: {}, truncate: true, cascade: true });
+  await User.destroy({ where: {}, truncate: true, cascade: true });
 
   console.log('Voorbeeldgebruikers aanmaken...');
   const wachtwoord = bcrypt.hashSync('wachtwoord123', 10);
